@@ -25,14 +25,16 @@ if [ "$RUN_DB_INIT" = "1" ]; then
   python manage.py migrate --noinput
   python manage.py collectstatic --noinput
 
-  # Create the admin account from env on first boot. createsuperuser --noinput
-  # reads DJANGO_SUPERUSER_EMAIL / _PASSWORD / _FULL_NAME (this model logs in by
-  # email; full_name is REQUIRED_FIELDS). It errors if the user already exists
-  # (fine — that's caught) but SILENTLY does nothing if EMAIL/PASSWORD are unset,
-  # which on a no-seed DB leaves you with no way to log in.
-  if [ "$DJANGO_CREATE_SUPERUSER" = "true" ]; then
-    echo "Ensuring superuser '$DJANGO_SUPERUSER_EMAIL' exists ..."
-    python manage.py createsuperuser --noinput 2>/dev/null || true
+  # Create OR reset the admin account from env on every boot. We deliberately
+  # do NOT use `createsuperuser --noinput`: it errors on an already-existing
+  # user and can never fix a bad/unusable password — which strands you with no
+  # way to log in on a no-seed DB. This upsert is idempotent: it creates the
+  # user when missing and otherwise resets its password, role, and flags. The
+  # password is read from os.environ *inside* Python so shell quoting can never
+  # mangle special characters. No-op unless both EMAIL and PASSWORD are set.
+  if [ "$DJANGO_CREATE_SUPERUSER" = "true" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    echo "Ensuring superuser '$DJANGO_SUPERUSER_EMAIL' exists (create or reset) ..."
+    python manage.py shell -c "import os; from accounts.models import User; email=os.environ['DJANGO_SUPERUSER_EMAIL']; u,created=User.all_objects.get_or_create(email=email, defaults={'full_name': os.environ.get('DJANGO_SUPERUSER_FULL_NAME') or 'Admin'}); u.full_name = u.full_name or os.environ.get('DJANGO_SUPERUSER_FULL_NAME') or 'Admin'; u.role='super_admin'; u.is_active=True; u.is_staff=True; u.is_superuser=True; u.is_deleted=False; u.set_password(os.environ['DJANGO_SUPERUSER_PASSWORD']); u.save(); print('superuser', 'created' if created else 'reset', u.email, u.role)"
   fi
 
   # Optional demo data (9 role logins, password campus123) so a fresh database
