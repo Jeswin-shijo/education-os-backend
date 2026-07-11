@@ -38,6 +38,10 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     teacherName = serializers.CharField(source="teacher_name", read_only=True)
     teacherSubject = serializers.CharField(source="subject_label", read_only=True)
     avatarColor = serializers.CharField(source="avatar_color", read_only=True)
+    # The parent participant's name — the counterpart shown in the FACULTY view
+    # (the faculty's Messages screen lists parents, not themselves). Parent
+    # screens ignore it and keep using teacherName.
+    parentName = serializers.CharField(source="parent.full_name", read_only=True)
     lastMessageAt = serializers.DateTimeField(source="last_message_at", read_only=True)
     unread = serializers.SerializerMethodField()
     messages = ChatMessageSerializer(many=True, read_only=True)
@@ -49,6 +53,7 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             "teacherName",
             "teacherSubject",
             "avatarColor",
+            "parentName",
             "lastMessageAt",
             "unread",
             "messages",
