@@ -44,6 +44,24 @@ class DepartmentService(BaseService):
     repository_class = DepartmentRepository
     entity_name = "Department"
 
+    def create(self, **data):
+        """Restore a soft-deleted department instead of inserting a duplicate.
+
+        ``code`` is unique at the DB level, and the constraint counts
+        soft-deleted rows — so re-creating a department whose code matches a
+        previously-deleted one would raise an IntegrityError (surfacing as a
+        500). If a soft-deleted department already owns this code, undelete it
+        and apply the new values; this also re-links any programs/students that
+        still point at that row. Otherwise create normally.
+        """
+        code = data.get("code")
+        if code:
+            existing = self.model.all_objects.filter(code=code, is_deleted=True).first()
+            if existing is not None:
+                existing.restore()
+                return self.update(existing, **data)
+        return super().create(**data)
+
     def delete(self, instance):
         """Refuse to delete a department that still owns records.
 
