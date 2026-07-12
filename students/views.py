@@ -19,6 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.cache import invalidate_prefix
 from core.permissions import Role
 from core.viewsets import BaseModelViewSet
 
@@ -40,14 +41,20 @@ from students.serializers import (
     StudentSerializer,
 )
 from students.services import (
+    DASHBOARD_PREFIX,
     GuardianService,
     MedicalService,
+    STUDENTS_PREFIX,
     StudentAddressService,
     StudentDocumentService,
     StudentService,
 )
 
 _STAFF_ROLES = set(Role.STAFF)
+
+
+def _truthy(value) -> bool:
+    return str(value).lower() in ("1", "true", "yes", "on")
 
 
 class StudentViewSet(BaseModelViewSet):
@@ -65,11 +72,31 @@ class StudentViewSet(BaseModelViewSet):
     def get_queryset(self):
         # The detail view prefetches child collections; list stays lean.
         qs = super().get_queryset()
+        # ?active=true|false filters by the linked login's is_active, so the
+        # roster can show active-only (default) or include deactivated students.
+        active = self.request.query_params.get("active")
+        if active is not None:
+            qs = qs.filter(user__is_active=_truthy(active))
         if self.action == "retrieve":
             return qs.prefetch_related(
                 "addresses", "guardians", "documents", "medical"
             )
         return qs
+
+    def perform_destroy(self, instance):
+        # `?hard=true` = permanent removal: hard-delete the student (child
+        # attendance/fees/etc. cascade) AND their login account, so it's gone
+        # from the DB forever. Default stays a soft-delete + login deactivation
+        # (StudentService.delete), which is reversible.
+        if _truthy(self.request.query_params.get("hard", "")):
+            user = instance.user
+            instance.hard_delete()
+            if user is not None:
+                user.hard_delete()
+            invalidate_prefix(STUDENTS_PREFIX)
+            invalidate_prefix(DASHBOARD_PREFIX)
+            return
+        super().perform_destroy(instance)
 
     # -- GET/PUT /students/me -------------------------------------------------
     def _resolve_me(self, request):

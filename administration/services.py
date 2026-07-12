@@ -224,9 +224,10 @@ class AdminDashboardService:
                 "subjects": Subject.objects.count(),
                 "classSessions": ClassSession.objects.count(),
             },
-            # Enrolled students that are currently ACTIVE (excludes inactive /
-            # alumni) — this is the headline "Students" count on the dashboard.
-            "students": Student.objects.filter(status=Student.STATUS_ACTIVE).count(),
+            # Enrolled students whose login is active — the headline "active
+            # students" count. A deactivated login drops out here; reactivating
+            # (or a hard delete) is reflected because student writes bust this cache.
+            "students": Student.objects.filter(user__is_active=True).count(),
             "facultyProfiles": FacultyProfile.objects.count(),
             "assignments": Assignment.objects.count(),
             "exams": Exam.objects.count(),

@@ -106,12 +106,19 @@ class StudentSerializer(serializers.ModelSerializer):
     guardians = GuardianSerializer(many=True, read_only=True)
     documents = StudentDocumentSerializer(many=True, read_only=True)
     medical = MedicalSerializer(read_only=True)
+    # Whether the student's login account is enabled. Drives the roster's
+    # active/inactive state (a student with no linked account counts as active).
+    active = serializers.SerializerMethodField()
+
+    def get_active(self, obj) -> bool:
+        return obj.user.is_active if obj.user_id else True
 
     class Meta:
         model = Student
         fields = [
             "id",
             "user",
+            "active",
             "roll_no",
             "admission_no",
             "program",
