@@ -53,10 +53,12 @@ class FacultyProfileService(BaseService):
     # reference (id/code/name) to the academics FK, then create-or-get the
     # FacultyProfile. ``phone`` lives on the User, so it is synced there.
     def create(self, **data):
+        photo = data.pop("profile_pic", None)
         user_fields = self._pop_user_fields(data)
         department_ref = data.pop("department", None)
 
         user = self._resolve_or_create_user(user_fields)
+        self._apply_profile_pic(user, photo)
         department = self._resolve_department(department_ref)
 
         profile_fields = {k: data[k] for k in _PROFILE_FIELDS if k in data}
@@ -92,6 +94,7 @@ class FacultyProfileService(BaseService):
         return instance
 
     def update(self, instance, **data):
+        photo = data.pop("profile_pic", None)
         user_fields = self._pop_user_fields(data)
         # A department reference (id/code/name) may be updated too.
         if "department" in data:
@@ -99,6 +102,7 @@ class FacultyProfileService(BaseService):
         instance = super().update(instance, **data)
         self._sync_user_phone(instance, user_fields.get("phone"))
         self._sync_user_fields(instance, user_fields)
+        self._apply_profile_pic(getattr(instance, "user", None), photo)
         return instance
 
     # -- helpers ---------------------------------------------------------
@@ -195,6 +199,15 @@ class FacultyProfileService(BaseService):
         if user is not None and user.phone != phone:
             user.phone = phone
             user.save(update_fields=["phone", "updated_at"])
+
+    @staticmethod
+    def _apply_profile_pic(user, photo) -> None:
+        """Save an uploaded profile picture onto the faculty's User (→ object
+        storage when USE_S3). No-op when no file was supplied."""
+        if user is None or photo is None:
+            return
+        user.profile_pic = photo
+        user.save(update_fields=["profile_pic", "updated_at"])
 
     @staticmethod
     def _sync_user_fields(instance, fields: dict) -> None:

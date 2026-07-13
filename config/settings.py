@@ -78,7 +78,6 @@ INSTALLED_APPS = [
     "analytics",
     "dashboards",
     "administration",
-    "campus",
 ]
 
 MIDDLEWARE = [
@@ -220,15 +219,12 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ),
-    "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-    ),
+    "DEFAULT_THROTTLE_CLASSES": [],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": os.environ.get("THROTTLE_ANON", "60/min"),
-        "user": os.environ.get("THROTTLE_USER", "1000/day"),
-        "login": os.environ.get("THROTTLE_LOGIN", "5/min"),
-        "password_reset": os.environ.get("THROTTLE_PASSWORD_RESET", "3/min"),
+        "anon": os.environ.get("THROTTLE_ANON", "1000/min"),
+        "user": os.environ.get("THROTTLE_USER", "10000/day"),
+        "login": os.environ.get("THROTTLE_LOGIN", "30/min"),
+        "password_reset": os.environ.get("THROTTLE_PASSWORD_RESET", "10/min"),
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

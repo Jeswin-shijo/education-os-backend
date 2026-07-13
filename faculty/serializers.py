@@ -78,6 +78,14 @@ class FacultyProfileSerializer(serializers.ModelSerializer):
         required=False, write_only=True, allow_blank=True,
         style={"input_type": "password"},
     )
+    # Profile picture: uploaded as a file (``profile_pic``, write-only, stored on
+    # the linked User's ImageField → object storage when USE_S3). On read,
+    # ``photo_url`` resolves that uploaded file's URL fresh each time, falling back
+    # to any externally-hosted URL stored on the profile.
+    profile_pic = serializers.ImageField(
+        required=False, allow_null=True, write_only=True
+    )
+    photo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = FacultyProfile
@@ -98,6 +106,7 @@ class FacultyProfileSerializer(serializers.ModelSerializer):
             "qualifications",
             "experience",
             "photo_url",
+            "profile_pic",
             "subject_codes",
             "created_at",
             "updated_at",
@@ -124,6 +133,19 @@ class FacultyProfileSerializer(serializers.ModelSerializer):
                 {"email": "Provide an email (or an existing user id) to create faculty."}
             )
         return attrs
+
+    def get_photo_url(self, obj) -> str:
+        """Resolve the faculty photo: the uploaded User.profile_pic (fresh URL each
+        read, so signed URLs never go stale) or the stored external URL."""
+        user = getattr(obj, "user", None)
+        pic = getattr(user, "profile_pic", None) if user is not None else None
+        if pic:
+            url = pic.url
+            request = self.context.get("request")
+            if request is not None and not url.startswith(("http://", "https://")):
+                return request.build_absolute_uri(url)
+            return url
+        return obj.photo_url or ""
 
 
 # --- App-shaped read serializers (mobile contract) ---------------------------

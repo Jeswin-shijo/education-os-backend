@@ -8,6 +8,9 @@ services:
       CORS_ALLOW_ALL_ORIGINS: "True"
       # Dev only: Android emulators reach the host machine as 10.0.2.2.
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,0.0.0.0,10.0.2.2"
+      # Dev only: relax the 5/min login rate-limit so testing / a few password
+      # retries don't trigger a 60s "Request was throttled" lockout.
+      THROTTLE_LOGIN: "100/min"
     volumes:
       - .:/app
     command: >
