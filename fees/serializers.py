@@ -18,6 +18,8 @@ class FeeInvoiceSerializer(serializers.ModelSerializer):
     """Matches ``types.ts`` ``FeeInvoice`` (camelCase); amount as a number."""
 
     id = serializers.CharField(read_only=True)
+    studentName = serializers.CharField(source="student.full_name", read_only=True)
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     dueDate = serializers.DateField(
         source="due_date",
@@ -37,6 +39,8 @@ class FeeInvoiceSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "student",
+            "studentName",
+            "student_name",
             "title",
             "term",
             "amount",
@@ -46,7 +50,15 @@ class FeeInvoiceSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "status", "paidOn", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "studentName",
+            "student_name",
+            "status",
+            "paidOn",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class PaymentSerializer(serializers.ModelSerializer):

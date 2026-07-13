@@ -100,8 +100,10 @@ class FeesAPITests(APITestCase):
     def test_app_shape_camelcase(self):
         self.client.force_authenticate(self.student_user)
         row = self.client.get(reverse("fees:fee-list")).json()["data"]["results"][0]
-        for key in ("id", "title", "term", "amount", "dueDate", "status"):
+        for key in ("id", "studentName", "student_name", "title", "term", "amount", "dueDate", "status"):
             self.assertIn(key, row)
+        self.assertEqual(row["studentName"], "Abin Thomas")
+        self.assertEqual(row["student_name"], "Abin Thomas")
 
     # -- total-due (scoped) ----------------------------------------------
     def test_total_due_scoped_to_student(self):
