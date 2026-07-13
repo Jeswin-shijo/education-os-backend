@@ -17,11 +17,16 @@ from certificates.models import Certificate
 class CertificateSerializer(serializers.ModelSerializer):
     """Full record used by the admin issue/CRUD viewset."""
 
+    studentName = serializers.CharField(source="student.full_name", read_only=True)
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
+
     class Meta:
         model = Certificate
         fields = [
             "id",
             "student",
+            "studentName",
+            "student_name",
             "title",
             "issuer",
             "issued_on",
@@ -31,7 +36,7 @@ class CertificateSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "studentName", "student_name", "created_at", "updated_at"]
 
 
 class CertificateAppSerializer(serializers.ModelSerializer):

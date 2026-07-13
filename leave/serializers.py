@@ -16,6 +16,9 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     """Read serializer matching ``types.ts`` ``LeaveRequest`` (camelCase)."""
 
     id = serializers.CharField(read_only=True)
+    student = serializers.CharField(source="user_id", read_only=True)
+    studentName = serializers.CharField(source="user.full_name", read_only=True)
+    student_name = serializers.CharField(source="user.full_name", read_only=True)
     # ``from`` is a reserved word; declare the field then rename it below.
     to = serializers.DateField(source="end_date", read_only=True)
     appliedOn = serializers.DateTimeField(source="applied_on", read_only=True)
@@ -24,6 +27,9 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         model = LeaveRequest
         fields = [
             "id",
+            "student",
+            "studentName",
+            "student_name",
             "type",
             "to",
             "reason",
@@ -38,6 +44,9 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         # Preserve app field order roughly (from before to).
         ordered = {
             "id": data["id"],
+            "student": data["student"],
+            "studentName": data["studentName"],
+            "student_name": data["student_name"],
             "type": data["type"],
             "from": data["from"],
             "to": data["to"],
@@ -55,6 +64,9 @@ class LeaveSpecSerializer(serializers.ModelSerializer):
     """
 
     id = serializers.CharField(read_only=True)
+    student = serializers.CharField(source="user_id", read_only=True)
+    studentName = serializers.CharField(source="user.full_name", read_only=True)
+    student_name = serializers.CharField(source="user.full_name", read_only=True)
     from_date = serializers.DateField(source="start_date", read_only=True)
     to_date = serializers.DateField(source="end_date", read_only=True)
     applied_on = serializers.DateTimeField(read_only=True)
@@ -63,6 +75,9 @@ class LeaveSpecSerializer(serializers.ModelSerializer):
         model = LeaveRequest
         fields = [
             "id",
+            "student",
+            "studentName",
+            "student_name",
             "type",
             "from_date",
             "to_date",

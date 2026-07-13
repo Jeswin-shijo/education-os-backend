@@ -38,18 +38,39 @@ class PlacementOpeningSerializer(serializers.ModelSerializer):
 class PlacementApplicationSerializer(serializers.ModelSerializer):
     """Full application record for admin management (status updates etc.)."""
 
+    studentName = serializers.CharField(source="student.full_name", read_only=True)
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
+    company_role = serializers.SerializerMethodField()
+
     class Meta:
         model = PlacementApplication
         fields = [
             "id",
             "opening",
+            "company_role",
             "student",
+            "studentName",
+            "student_name",
             "status",
             "applied_on",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "applied_on", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "company_role",
+            "studentName",
+            "student_name",
+            "applied_on",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_company_role(self, obj):
+        if not getattr(obj, "opening_id", None):
+            return ""
+        opening = obj.opening
+        return f"{opening.company} - {opening.role}"
 
 
 # --- App-shaped serializers (mobile contract: types.ts) ----------------------
