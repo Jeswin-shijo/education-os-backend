@@ -52,7 +52,7 @@ class EventsAPITests(APITestCase):
         self.client.force_authenticate(self.student_user)
         resp = self.client.get(reverse("events:event-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         self.assertEqual(len(data), 2)
         self.assertEqual(
@@ -173,7 +173,7 @@ class EventsAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_admin_can_update_and_delete_event(self):
         self.client.force_authenticate(self.admin)

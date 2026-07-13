@@ -58,8 +58,8 @@ class StudentsAPITests(APITestCase):
         self.client.force_authenticate(self.faculty)
         resp = self.client.get(reverse("students:student-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
-        self.assertGreaterEqual(resp.json()["meta"]["pagination"]["count"], 1)
+        self.assertEqual(resp.json()["status"], "success")
+        self.assertGreaterEqual(resp.json()["data"]["pagination"]["count"], 1)
 
     def test_student_cannot_list_roster(self):
         self.client.force_authenticate(self.student_user)
@@ -75,7 +75,7 @@ class StudentsAPITests(APITestCase):
         self.client.force_authenticate(self.admin)
         resp = self.client.get(reverse("students:student-list"), {"search": "CSE-001"})
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["meta"]["pagination"]["count"], 1)
+        self.assertEqual(resp.json()["data"]["pagination"]["count"], 1)
 
     def test_roster_filter_by_department(self):
         self.client.force_authenticate(self.admin)
@@ -83,7 +83,7 @@ class StudentsAPITests(APITestCase):
             reverse("students:student-list"), {"department": str(self.dept.id)}
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["meta"]["pagination"]["count"], 1)
+        self.assertEqual(resp.json()["data"]["pagination"]["count"], 1)
 
     # -- /students/me (app-shaped) ---------------------------------------
     def test_student_me_app_shape(self):
@@ -152,4 +152,4 @@ class StudentsAPITests(APITestCase):
             {"full_name": "No Roll"}, format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")

@@ -110,7 +110,7 @@ class AssignmentAPITests(APITestCase):
         self.client.force_authenticate(self.student_user)
         resp = self.client.get(reverse("assignments:assignments-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         by_title = {a["title"]: a for a in data}
         # Graded assignment reflects the student's graded submission.
@@ -179,7 +179,7 @@ class AssignmentAPITests(APITestCase):
             {}, format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_faculty_cannot_submit(self):
         self.client.force_authenticate(self.faculty_user)
@@ -228,7 +228,7 @@ class AssignmentAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     # -- faculty-created list --------------------------------------------
     def test_faculty_assignments_scoped_to_own_classes(self):

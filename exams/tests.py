@@ -141,7 +141,7 @@ class ExamsAPITests(APITestCase):
         self.client.force_authenticate(self.student_user)
         resp = self.client.get(reverse("exams:exams-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         self.assertEqual(data[0]["subjectId"], str(self.subject_ds.id))
         self.assertIn("durationMins", data[0])
@@ -254,7 +254,7 @@ class ExamsAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_student_cannot_post_marks(self):
         self.client.force_authenticate(self.student_user)

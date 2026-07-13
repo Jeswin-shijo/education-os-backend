@@ -239,7 +239,7 @@ class AttendanceAPITests(APITestCase):
             reverse("attendance:attendance-save-session"), body, format="json"
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     # -- faculty session list -------------------------------------------
     def test_faculty_lists_own_sessions(self):

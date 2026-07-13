@@ -89,9 +89,9 @@ class HostelAPITests(APITestCase):
         self.client.force_authenticate(self.student_user)
         resp = self.client.get(reverse("hostel:hostel-block-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         self.assertGreaterEqual(
-            resp.json()["meta"]["pagination"]["count"], 1
+            resp.json()["data"]["pagination"]["count"], 1
         )
 
     def test_room_filter_by_block(self):
@@ -100,7 +100,7 @@ class HostelAPITests(APITestCase):
             reverse("hostel:hostel-room-list"), {"block": str(self.block.id)}
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["meta"]["pagination"]["count"], 1)
+        self.assertEqual(resp.json()["data"]["pagination"]["count"], 1)
 
     # -- write RBAC + audit ----------------------------------------------
     def test_admin_can_create_block_and_it_is_audited(self):
@@ -143,7 +143,7 @@ class HostelAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     # -- cache invalidation on write -------------------------------------
     def test_info_cache_invalidated_on_allocation_update(self):

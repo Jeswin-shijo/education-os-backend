@@ -61,8 +61,8 @@ class AcademicsAPITests(APITestCase):
         self.client.force_authenticate(self.student)
         resp = self.client.get(reverse("academics:department-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
-        self.assertGreaterEqual(resp.json()["meta"]["pagination"]["count"], 1)
+        self.assertEqual(resp.json()["status"], "success")
+        self.assertGreaterEqual(resp.json()["data"]["pagination"]["count"], 1)
 
     def test_list_requires_auth(self):
         self.assertEqual(
@@ -146,4 +146,4 @@ class AcademicsAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")

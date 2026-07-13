@@ -190,7 +190,7 @@ class NotificationAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_broadcast_invalid_category(self):
         self.client.force_authenticate(self.admin)

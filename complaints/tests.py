@@ -78,7 +78,7 @@ class ComplaintAPITests(APITestCase):
         self.client.force_authenticate(self.student)
         resp = self.client.get(reverse("complaints:complaints-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         self.assertEqual(len(data), 2)
         subjects = sorted(row["subject"] for row in data)

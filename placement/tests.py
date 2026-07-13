@@ -83,7 +83,7 @@ class PlacementAPITests(APITestCase):
         self.client.force_authenticate(self.student_user)
         resp = self.client.get(reverse("placement:opening-app-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         self.assertEqual(len(data), 1)  # inactive hidden
         row = data[0]
@@ -237,7 +237,7 @@ class PlacementAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_student_cannot_list_admin_applications(self):
         self.client.force_authenticate(self.student_user)

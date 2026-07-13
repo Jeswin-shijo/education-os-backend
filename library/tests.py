@@ -81,7 +81,7 @@ class LibraryAPITests(APITestCase):
         self.client.force_authenticate(self.student_user)
         resp = self.client.get(reverse("library:book-search"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         self.assertEqual(len(data), 2)
         self.assertEqual(set(data[0].keys()), {"id", "title", "author", "category", "available"})
@@ -169,7 +169,7 @@ class LibraryAPITests(APITestCase):
         )
         # missing title AND copies_available > copies_total
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_student_cannot_list_admin_loans(self):
         self.client.force_authenticate(self.student_user)

@@ -77,7 +77,7 @@ class GuardiansAPITests(APITestCase):
         self.client.force_authenticate(self.admin)
         resp = self.client.get(reverse("guardians:guardians-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         self.assertGreaterEqual(len(resp.json()["data"]), 2)
 
     def test_list_requires_auth(self):
@@ -131,7 +131,7 @@ class GuardiansAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_create_link_non_parent_role_validation_error(self):
         self.client.force_authenticate(self.admin)
@@ -141,7 +141,7 @@ class GuardiansAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     # -- self-scoped parent children read --------------------------------
     def test_parent_children_shape(self):

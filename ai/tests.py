@@ -51,7 +51,7 @@ class AIAPITests(APITestCase):
         )
         self.assertEqual(resp.status_code, 200)
         body = resp.json()
-        self.assertTrue(body["success"])
+        self.assertEqual(body["status"], "success")
         self.assertIn("Explain deadlock", body["data"]["text"])
         # respond does not create a thread.
         self.assertEqual(AIThread.objects.count(), 0)
@@ -62,7 +62,7 @@ class AIAPITests(APITestCase):
             reverse("ai:respond", args=["bogus"]), {"prompt": "hi"}, format="json"
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_respond_uses_pluggable_provider(self):
         self.client.force_authenticate(self.student)

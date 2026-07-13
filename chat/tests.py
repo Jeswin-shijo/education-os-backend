@@ -134,7 +134,7 @@ class ChatAPITests(APITestCase):
             {"text": "   "}, format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_unrelated_parent_cannot_send_message(self):
         self.client.force_authenticate(self.other_parent)

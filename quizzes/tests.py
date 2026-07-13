@@ -64,7 +64,7 @@ class QuizAPITests(APITestCase):
         self.client.force_authenticate(self.student)
         resp = self.client.get(reverse("quizzes:quizzes-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "success")
         data = resp.json()["data"]
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["subjectId"], str(self.subject.id))
@@ -131,7 +131,7 @@ class QuizAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     def test_create_rejects_out_of_range_answer_index(self):
         self.client.force_authenticate(self.faculty)
@@ -142,7 +142,7 @@ class QuizAPITests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
-        self.assertFalse(resp.json()["success"])
+        self.assertEqual(resp.json()["status"], "error")
 
     # -- owner-scoped mutation -------------------------------------------
     def test_faculty_cannot_delete_another_facultys_quiz(self):
