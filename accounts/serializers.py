@@ -127,6 +127,9 @@ class RegisterSerializer(serializers.Serializer):
     blood_group = serializers.CharField(max_length=8, required=False, allow_blank=True, default="")
     mentor_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
 
+    # --- Optional faculty profile fields (used only when role == "faculty") ---
+    designation = serializers.CharField(max_length=128, required=False, allow_blank=True, default="")
+
     def validate_email(self, value):
         if UserRepository().email_exists(value):
             raise serializers.ValidationError("A user with this email already exists.")

@@ -295,6 +295,21 @@ class RegisterView(APIView):
             if value:
                 student_fields[key] = value
 
+        # Extract faculty profile fields.
+        faculty_fields = {}
+        for key in ("designation",):
+            value = data.pop(key, None)
+            if value:
+                faculty_fields[key] = value
+        # Department is shared between student and faculty — keep in both.
+        if "department" not in student_fields:
+            dept = data.pop("department", None)
+            if dept:
+                student_fields["department"] = dept
+                faculty_fields["department"] = dept
+        else:
+            faculty_fields["department"] = student_fields.get("department")
+
         # Handle profile_pic separately (file upload).
         profile_pic = data.pop("profile_pic", None)
 
@@ -339,4 +354,21 @@ class RegisterView(APIView):
             response_data["student_id"] = str(student_profile.id)
             response_data["roll_no"] = student_profile.roll_no
 
+        # Auto-create faculty profile if role is faculty and department given.
+        faculty_profile = None
+        if user.role == Role.FACULTY or user.role == Role.HOD:
+            dept_id = faculty_fields.get("department")
+            if dept_id:
+                from faculty.models import FacultyProfile
+                faculty_profile = FacultyProfile.objects.create(
+                    user=user,
+                    department_id=dept_id,
+                    designation=faculty_fields.get("designation", ""),
+                )
+
+        if faculty_profile:
+            response_data["faculty_id"] = str(faculty_profile.id)
+            response_data["designation"] = faculty_profile.designation
+
         return Response(response_data, status=status.HTTP_201_CREATED)
+
