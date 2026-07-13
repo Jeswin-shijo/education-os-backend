@@ -22,6 +22,10 @@ urlpatterns = [
 ]
 
 
+def unwrap_results(data):
+    return data["results"] if isinstance(data, dict) and "results" in data else data
+
+
 @override_settings(ROOT_URLCONF=__name__)
 class ComplaintAPITests(APITestCase):
     def setUp(self):
@@ -79,7 +83,7 @@ class ComplaintAPITests(APITestCase):
         resp = self.client.get(reverse("complaints:complaints-list"))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["status"], "success")
-        data = resp.json()["data"]
+        data = unwrap_results(resp.json()["data"])
         self.assertEqual(len(data), 2)
         subjects = sorted(row["subject"] for row in data)
         self.assertEqual(subjects, ["Missing marks", "Water leak"])
@@ -91,7 +95,7 @@ class ComplaintAPITests(APITestCase):
         self.client.force_authenticate(self.faculty)
         resp = self.client.get(reverse("complaints:complaints-list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.json()["data"]), 3)
+        self.assertEqual(len(unwrap_results(resp.json()["data"])), 3)
 
     def test_student_cannot_retrieve_others_complaint(self):
         self.client.force_authenticate(self.student)
@@ -179,7 +183,7 @@ class ComplaintAPITests(APITestCase):
         self.client.force_authenticate(self.principal)
         resp = self.client.get(reverse("complaints:complaints-monitor"))
         self.assertEqual(resp.status_code, 200, resp.content)
-        data = resp.json()["data"]
+        data = unwrap_results(resp.json()["data"])
         self.assertEqual(data["total"], 3)
         by_status = {row["status"]: row["count"] for row in data["byStatus"]}
         self.assertEqual(by_status["open"], 1)
@@ -198,7 +202,7 @@ class ComplaintAPITests(APITestCase):
             reverse("complaints:complaints-monitor"), {"status": "resolved"}
         )
         self.assertEqual(resp.status_code, 200)
-        data = resp.json()["data"]
+        data = unwrap_results(resp.json()["data"])
         self.assertEqual(data["total"], 3)
         self.assertEqual(len(data["complaints"]), 1)
         self.assertEqual(data["complaints"][0]["subject"], "Wrong invoice")
