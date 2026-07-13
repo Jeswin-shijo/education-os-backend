@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "analytics",
     "dashboards",
     "administration",
+    "campus",
 ]
 
 MIDDLEWARE = [

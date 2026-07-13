@@ -116,6 +116,43 @@ class FacultyAPITests(APITestCase):
             AuditLog.objects.filter(entity="FacultyProfile", action="create").exists()
         )
 
+    def test_admin_can_create_faculty_with_uploaded_photo(self):
+        """A multipart create carrying a ``profile_pic`` file stores the image on
+        the new faculty User and surfaces it back through ``photo_url``."""
+        import shutil
+        import tempfile
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (4, 4), "#123456").save(buf, format="PNG")
+        photo = SimpleUploadedFile("face.png", buf.getvalue(), content_type="image/png")
+
+        media_tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_tmp, ignore_errors=True)
+
+        self.client.force_authenticate(self.admin)
+        with override_settings(MEDIA_ROOT=media_tmp):
+            resp = self.client.post(
+                reverse("faculty:faculty-list"),
+                {
+                    "full_name": "Dr. Photo",
+                    "email": "photo@example.com",
+                    "department": str(self.dept.id),
+                    "designation": "Professor",
+                    "profile_pic": photo,
+                },
+                format="multipart",
+            )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        photo_url = resp.json()["data"]["photo_url"]
+        self.assertTrue(photo_url)
+        self.assertIn(".png", photo_url.lower())
+        created = User.objects.get(email__iexact="photo@example.com")
+        self.assertTrue(created.profile_pic)
+
     def test_faculty_cannot_create_profile(self):
         self.client.force_authenticate(self.faculty_user)
         resp = self.client.post(
