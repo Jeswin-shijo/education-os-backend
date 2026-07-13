@@ -14,6 +14,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from core.models import AuditLog
+from core.permissions import Role
 from core.services import BaseService
 from accounts.models import OTP
 from accounts.repositories import UserRepository
@@ -28,6 +29,14 @@ class InvalidCredentials(Exception):
 
 class InactiveAccount(Exception):
     """Raised when a valid credential belongs to a disabled account."""
+
+
+class ParentLoginDisabled(Exception):
+    """Raised when a ``parent``-role account attempts to log in.
+
+    Parent login is disabled per client request; guardian info is retained on
+    the student record but the ``parent`` role can no longer authenticate.
+    """
 
 
 class InvalidOTP(Exception):
@@ -86,6 +95,11 @@ class AuthService(BaseService):
 
     def login(self, credential: str, password: str) -> dict:
         user = self.authenticate(credential, password)
+        # Parent login is disabled: credentials may be valid, but the ``parent``
+        # role is not allowed to obtain a session. Guardian info stays on the
+        # student record; only authentication for this role is blocked.
+        if getattr(user, "role", None) == Role.PARENT:
+            raise ParentLoginDisabled("Parent login is disabled.")
         tokens = TokenIssuer.pair(user)
         self.actor = user  # so the audit row is attributed to the logging-in user
         self.audit(AuditLog.ACTION_LOGIN, entity_id=user.pk)
@@ -95,17 +109,24 @@ class AuthService(BaseService):
     def roles_for(self, user) -> list[str]:
         """Roles this user may act as. The model carries a single canonical
         role, so the allowed set is just that role (superusers may act as any).
-        """
-        from core.permissions import Role
 
+        ``parent`` is never returned: parent login/portal access is disabled, so
+        it must not appear as a usable or act-as role (this also blocks
+        switching TO parent, which reuses this allowed set).
+        """
         if getattr(user, "is_superuser", False):
-            return list(Role.ALL)
-        return [user.role]
+            roles = list(Role.ALL)
+        else:
+            roles = [user.role]
+        return [r for r in roles if r != Role.PARENT]
 
     def switch_role(self, user, role: str) -> dict:
         """Re-issue an access token whose ``active_role`` claim is ``role``.
 
-        Rejects roles outside the user's allowed set."""
+        Rejects roles outside the user's allowed set. Switching TO the disabled
+        ``parent`` role is never permitted."""
+        if role == Role.PARENT:
+            raise InvalidCredentials("Parent role is disabled.")
         if role not in self.roles_for(user):
             raise InvalidCredentials("You cannot switch to that role.")
         tokens = TokenIssuer.pair(user, active_role=role)

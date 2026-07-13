@@ -33,6 +33,12 @@ class FacultyProfile(BaseModel):
         related_name="faculty_profiles",
     )
     designation = models.CharField(max_length=128, blank=True, default="")
+    # Personal-info fields surfaced by the admin console.
+    qualifications = models.TextField(blank=True, default="")
+    experience = models.TextField(blank=True, default="")
+    # Profile picture (S3 object URL). max_length raised above the URLField
+    # default (200) since S3 URLs with query params can exceed it.
+    photo_url = models.URLField(max_length=500, blank=True, default="")
     # List of subject codes this faculty teaches, mirroring the app's
     # ``FacultyPerformance.subjects`` (e.g. ["sub-ds", "sub-os"]).
     subject_codes = models.JSONField(default=list, blank=True)
@@ -47,6 +53,16 @@ class FacultyProfile(BaseModel):
 
     def __str__(self):
         return f"{self.user.full_name} ({self.designation or 'Faculty'})"
+
+    @property
+    def phone(self) -> str:
+        """The linked user's phone number.
+
+        Read-only convenience so serializers can expose the contact number that
+        lives on ``accounts.User``; writes are synced back to the user by
+        :class:`faculty.services.FacultyProfileService`.
+        """
+        return self.user.phone if self.user_id else ""
 
 
 class FacultyClass(BaseModel):

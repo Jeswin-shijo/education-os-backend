@@ -43,6 +43,7 @@ from accounts.services import (
     InactiveAccount,
     InvalidCredentials,
     InvalidOTP,
+    ParentLoginDisabled,
     TokenIssuer,
     UserService,
 )
@@ -109,6 +110,9 @@ class LoginView(APIView):
                 serializer.validated_data["credential"],
                 serializer.validated_data["password"],
             )
+        except ParentLoginDisabled as exc:
+            # 403: credentials are valid, but the parent role may not log in.
+            raise PermissionDenied(str(exc))
         except (InvalidCredentials, InactiveAccount) as exc:
             raise AuthenticationFailed(str(exc))
         payload = _token_payload(

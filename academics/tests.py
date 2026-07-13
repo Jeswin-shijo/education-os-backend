@@ -126,7 +126,9 @@ class AcademicsAPITests(APITestCase):
         ok = self.client.post(
             reverse("academics:subject-list"),
             {"code": "sub-os", "name": "Operating Systems", "credits": 3,
-             "department": str(self.dept.id)}, format="json",
+             "department": str(self.dept.id), "program": str(self.program.id),
+             "semester": str(self.sem.id), "academic_session": "2026-2027"},
+            format="json",
         )
         self.assertEqual(ok.status_code, 201)
         forbidden = self.client.post(

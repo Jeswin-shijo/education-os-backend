@@ -34,6 +34,8 @@ ATTENDANCE_RECORD_MATRIX = {
     "summary": SELF_READERS,
     "overall": SELF_READERS,
     "records": SELF_READERS,
+    # staff/admin attendance analytics (admin graph)
+    "analytics": STAFF,
     # mobile spec read: GET /attendance/{user_id} (self/child scoped in view)
     "attendance_by_user": SELF_READERS,
     # faculty session endpoints

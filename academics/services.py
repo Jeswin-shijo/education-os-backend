@@ -95,6 +95,54 @@ class ProgramService(BaseService):
     repository_class = ProgramRepository
     entity_name = "Program"
 
+    def create(self, **data):
+        """Create the program and auto-generate its semesters.
+
+        A program spans ``duration_years * 2`` semesters (4yr → 1..8, 3yr → 1..6,
+        2yr → 1..4). Semester generation is idempotent, so re-running only fills
+        the gaps.
+        """
+        program = super().create(**data)
+        self.ensure_semesters(program)
+        return program
+
+    def ensure_semesters(self, program) -> int:
+        """Idempotently create the ``1..duration_years*2`` semesters for a program.
+
+        Returns the number of semesters newly created. Only missing numbers are
+        inserted (soft-deleted rows are restored rather than duplicated), so this
+        is safe to call repeatedly.
+        """
+        total = (program.duration_years or 0) * 2
+        if total <= 0:
+            return 0
+
+        existing = set(
+            Semester.all_objects.filter(program=program).values_list(
+                "number", flat=True
+            )
+        )
+        created = 0
+        for number in range(1, total + 1):
+            if number in existing:
+                # Restore a soft-deleted semester rather than leaving a gap.
+                sem = Semester.all_objects.filter(
+                    program=program, number=number, is_deleted=True
+                ).first()
+                if sem is not None:
+                    sem.restore()
+                continue
+            Semester.objects.create(
+                program=program,
+                number=number,
+                created_by=self._actor_or_none(),
+                updated_by=self._actor_or_none(),
+            )
+            created += 1
+        if created:
+            self.invalidate_cache(program)
+        return created
+
 
 class SemesterService(BaseService):
     model = Semester
@@ -116,6 +164,27 @@ class SubjectService(BaseService):
     model = Subject
     repository_class = SubjectRepository
     entity_name = "Subject"
+
+    def create(self, **data):
+        """Create a subject, assigning the ``faculties`` M2M after insert.
+
+        A M2M cannot be set during ``objects.create``; pop it out, create the
+        row, then ``set`` the relation.
+        """
+        faculties = data.pop("faculties", None)
+        instance = super().create(**data)
+        if faculties is not None:
+            instance.faculties.set(faculties)
+        return instance
+
+    def update(self, instance, **data):
+        """Update a subject; only reassign ``faculties`` when it was supplied."""
+        has_faculties = "faculties" in data
+        faculties = data.pop("faculties", None)
+        instance = super().update(instance, **data)
+        if has_faculties:
+            instance.faculties.set(faculties or [])
+        return instance
 
     def invalidate_cache(self, instance=None) -> None:
         invalidate_prefix(SUBJECTS_PREFIX)

@@ -270,3 +270,113 @@ class AttendanceAPITests(APITestCase):
             {"classId": str(self.other_klass.id)},
         )
         self.assertEqual(resp.status_code, 403)
+
+
+@override_settings(ROOT_URLCONF=__name__)
+class AttendanceAnalyticsTests(APITestCase):
+    """The staff/admin ``GET /attendance/analytics`` rollups for the admin graph."""
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        # LocMemCache persists across tests in-process; the analytics payload is
+        # cached under ``attendance:analytics`` so clear it for deterministic runs.
+        cache.clear()
+
+        pwd = "Str0ng-Pass!23"
+        self.admin = User.objects.create_user(
+            email="admin@example.com", password=pwd, full_name="Admin", role=Role.ADMIN
+        )
+        self.student_user = User.objects.create_user(
+            email="abin@example.com", password=pwd, full_name="Abin", role=Role.STUDENT
+        )
+        self.rao = User.objects.create_user(
+            email="rao@example.com", password=pwd, full_name="Dr. Rao", role=Role.FACULTY
+        )
+        self.menon = User.objects.create_user(
+            email="menon@example.com", password=pwd, full_name="Dr. Menon",
+            role=Role.FACULTY,
+        )
+
+        self.dept = Department.objects.create(code="CSE", name="Computer Science")
+        self.program = Program.objects.create(
+            code="BTCSE", name="B.Tech CSE", department=self.dept,
+            duration_years=4, intake=60,
+        )
+        self.sem = Semester.objects.create(program=self.program, number=5)
+        self.section = Section.objects.create(semester=self.sem, name="A")
+        # Subjects carry semester (→ program) + assigned faculty so the
+        # by_program / by_faculty joins have real buckets.
+        self.ds = Subject.objects.create(
+            code="sub-ds", name="Data Structures", credits=4,
+            department=self.dept, semester=self.sem, faculty=self.rao,
+        )
+        self.os = Subject.objects.create(
+            code="sub-os", name="Operating Systems", credits=3,
+            department=self.dept, semester=self.sem, faculty=self.menon,
+        )
+        self.student = Student.objects.create(
+            user=self.student_user, roll_no="CSE001", full_name="Abin Thomas",
+            department=self.dept, program=self.program, semester=self.sem,
+            section=self.section, email="abin@example.com",
+        )
+        # DS: 4 attended / 5 total → 80%; OS: 3 / 3 → 100%. Dept/program: 7/8 → 88%.
+        for d, st in [
+            (date(2026, 6, 1), "present"),
+            (date(2026, 6, 2), "present"),
+            (date(2026, 6, 3), "late"),
+            (date(2026, 6, 4), "present"),
+            (date(2026, 6, 5), "absent"),
+        ]:
+            AttendanceRecord.objects.create(
+                student=self.student, subject=self.ds, date=d, status=st
+            )
+        for d in [date(2026, 6, 1), date(2026, 6, 2), date(2026, 6, 3)]:
+            AttendanceRecord.objects.create(
+                student=self.student, subject=self.os, date=d, status="present"
+            )
+
+    def test_analytics_rollups_for_admin(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get(reverse("attendance:attendance-analytics"))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["data"]
+
+        # Overall 7/8 → round(87.5) = 88.
+        self.assertEqual(data["overall_percent"], 88)
+
+        by_dept = {r["code"]: r for r in data["by_department"]}
+        self.assertEqual(by_dept["CSE"]["name"], "Computer Science")
+        self.assertEqual(by_dept["CSE"]["percent"], 88)
+
+        by_prog = {r["code"]: r for r in data["by_program"]}
+        self.assertEqual(by_prog["BTCSE"]["name"], "B.Tech CSE")
+        self.assertEqual(by_prog["BTCSE"]["percent"], 88)
+
+        by_fac = {r["name"]: r for r in data["by_faculty"]}
+        self.assertEqual(by_fac["Dr. Rao"]["id"], str(self.rao.id))
+        self.assertEqual(by_fac["Dr. Rao"]["percent"], 80)
+        self.assertEqual(by_fac["Dr. Menon"]["percent"], 100)
+
+    def test_analytics_forbidden_for_student(self):
+        self.client.force_authenticate(self.student_user)
+        resp = self.client.get(reverse("attendance:attendance-analytics"))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_analytics_requires_auth(self):
+        resp = self.client.get(reverse("attendance:attendance-analytics"))
+        self.assertEqual(resp.status_code, 401)
+
+    def test_analytics_empty_data_graceful(self):
+        AttendanceRecord.objects.all().delete()
+        from django.core.cache import cache
+
+        cache.clear()
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get(reverse("attendance:attendance-analytics"))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()["data"]
+        self.assertEqual(data["overall_percent"], 0)
+        self.assertEqual(data["by_department"], [])
+        self.assertEqual(data["by_program"], [])
+        self.assertEqual(data["by_faculty"], [])

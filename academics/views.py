@@ -201,12 +201,27 @@ class SectionViewSet(BaseModelViewSet):
 
 
 class SubjectViewSet(BaseModelViewSet):
-    queryset = Subject.objects.select_related("department", "faculty", "semester", "semester__program").all()
+    queryset = (
+        Subject.objects.select_related(
+            "department", "faculty", "program", "semester", "semester__program"
+        )
+        .prefetch_related("faculties__user")
+        .all()
+    )
     serializer_class = SubjectSerializer
     service_class = SubjectService
     permission_matrix = ADMIN_HOD_WRITE_MATRIX
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["code", "department", "semester", "credits", "faculty"]
+    filterset_fields = [
+        "code",
+        "department",
+        "program",
+        "semester",
+        "credits",
+        "faculty",
+        "faculties",
+        "academic_session",
+    ]
     search_fields = ["code", "name", "faculty_name"]
     ordering_fields = ["code", "name", "credits", "created_at"]
 
@@ -248,13 +263,17 @@ class TimetableViewSet(
     Writes (admin-only) flow through :class:`ClassSessionService`.
     """
 
-    queryset = ClassSession.objects.select_related("subject", "section").all()
+    queryset = ClassSession.objects.select_related(
+        "subject", "section", "faculty"
+    ).all()
     serializer_class = ClassSessionSerializer
     service_class = ClassSessionService
     permission_classes = [IsAuthenticated, RoleModelPermission]
     permission_matrix = TIMETABLE_MATRIX
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ["section", "subject", "day", "type"]
+    # ``faculty`` filters the timetable to one faculty member's sessions
+    # (``GET /timetable?faculty=<user_id>``).
+    filterset_fields = ["section", "subject", "day", "type", "faculty", "shift", "status"]
     ordering_fields = ["day", "start", "created_at"]
 
     # -- service-backed writes (mirror BaseModelViewSet) -----------------

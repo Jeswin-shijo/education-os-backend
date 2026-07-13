@@ -12,6 +12,19 @@ from django.db import models
 from core.models import BaseModel
 
 
+# Shift choices shared by ``Section`` (the class group) and ``ClassSession``
+# (a timetable slot). A class group is conceptually
+# Program + Semester + Shift + Section(name).
+SHIFT_MORNING = "Morning"
+SHIFT_AFTERNOON = "Afternoon"
+SHIFT_EVENING = "Evening"
+SHIFT_CHOICES = [
+    (SHIFT_MORNING, "Morning"),
+    (SHIFT_AFTERNOON, "Afternoon"),
+    (SHIFT_EVENING, "Evening"),
+]
+
+
 class Department(BaseModel):
     """An academic department, e.g. CSE / ECE / MECH."""
 
@@ -82,7 +95,12 @@ class Semester(BaseModel):
 
 
 class Section(BaseModel):
-    """A section (class group) within a semester, e.g. "A" / "B"."""
+    """A section (class group) within a semester, e.g. "A" / "B".
+
+    A class group is conceptually Program + Semester + Shift + Section(name);
+    the owning ``Program``/``Semester`` are reached via the ``semester`` FK, and
+    ``shift`` distinguishes the Morning/Afternoon/Evening batch.
+    """
 
     semester = models.ForeignKey(
         Semester,
@@ -90,6 +108,12 @@ class Section(BaseModel):
         related_name="sections",
     )
     name = models.CharField(max_length=32)
+    shift = models.CharField(
+        max_length=16,
+        choices=SHIFT_CHOICES,
+        default=SHIFT_MORNING,
+        help_text="Daily shift for this class group.",
+    )
 
     class Meta:
         ordering = ["semester", "name"]
@@ -116,6 +140,14 @@ class Subject(BaseModel):
         on_delete=models.CASCADE,
         related_name="subjects",
     )
+    program = models.ForeignKey(
+        Program,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subjects",
+        help_text="The program this subject belongs to.",
+    )
     semester = models.ForeignKey(
         Semester,
         on_delete=models.SET_NULL,
@@ -124,15 +156,29 @@ class Subject(BaseModel):
         related_name="subjects",
         help_text="The semester this subject is taught in.",
     )
+    academic_session = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text='Academic year label, e.g. "2026-2027".',
+    )
+    # Single-faculty fields kept for back-compat with the existing mobile
+    # endpoints; ``faculties`` is the new multi-faculty relation.
     faculty = models.ForeignKey(
         "accounts.User",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="subjects_teaching",
-        help_text="Assigned faculty member for this subject.",
+        help_text="Assigned faculty member for this subject (legacy single-faculty).",
     )
     faculty_name = models.CharField(max_length=255, blank=True, default="")
+    faculties = models.ManyToManyField(
+        "faculty.FacultyProfile",
+        blank=True,
+        related_name="taught_subjects",
+        help_text="All faculty members who teach this subject (multi-faculty).",
+    )
     color = models.CharField(max_length=9, blank=True, default="")
 
     class Meta:
@@ -179,6 +225,13 @@ class ClassSession(BaseModel):
         (TYPE_TUTORIAL, "Tutorial"),
     ]
 
+    STATUS_ACTIVE = "active"
+    STATUS_INACTIVE = "inactive"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_INACTIVE, "Inactive"),
+    ]
+
     subject = models.ForeignKey(
         Subject,
         on_delete=models.CASCADE,
@@ -204,6 +257,24 @@ class ClassSession(BaseModel):
     room = models.CharField(max_length=64, blank=True, default="")
     type = models.CharField(
         max_length=16, choices=TYPE_CHOICES, default=TYPE_LECTURE
+    )
+    academic_session = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        help_text='Academic year label, e.g. "2026-2027".',
+    )
+    shift = models.CharField(
+        max_length=16,
+        choices=SHIFT_CHOICES,
+        default=SHIFT_MORNING,
+        help_text="Daily shift for this session (mirrors Section.shift).",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_ACTIVE,
+        db_index=True,
     )
 
     class Meta:

@@ -6,6 +6,9 @@ Student self-scoped reads:
 - ``GET  /api/v1/attendance/overall``
 - ``GET  /api/v1/attendance/records`` (``?subjectId=``)
 
+Staff/admin analytics:
+- ``GET  /api/v1/attendance/analytics``
+
 Faculty session endpoints:
 - ``POST /api/v1/attendance``                 (save a session)
 - ``GET  /api/v1/faculty/attendance``         (``?classId=``)
@@ -47,6 +50,12 @@ urlpatterns = [
         "attendance/records",
         AttendanceViewSet.as_view({"get": "records"}),
         name="attendance-records",
+    ),
+    # Staff/admin analytics for the attendance graph.
+    path(
+        "attendance/analytics",
+        AttendanceViewSet.as_view({"get": "analytics"}),
+        name="attendance-analytics",
     ),
     # Faculty: save a session (POST /attendance) + list sessions.
     path(

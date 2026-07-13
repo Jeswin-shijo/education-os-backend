@@ -18,6 +18,7 @@ from academics.models import (
     Semester,
     Subject,
 )
+from faculty.models import FacultyProfile
 
 
 # --- CRUD serializers --------------------------------------------------------
@@ -67,7 +68,7 @@ class SemesterSerializer(serializers.ModelSerializer):
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
-        fields = ["id", "semester", "name", "created_at", "updated_at"]
+        fields = ["id", "semester", "name", "shift", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
@@ -75,15 +76,26 @@ class SubjectSerializer(serializers.ModelSerializer):
     department_code = serializers.CharField(
         source="department.code", read_only=True
     )
+    program_name = serializers.CharField(
+        source="program.name", read_only=True, default=None
+    )
     semester_number = serializers.IntegerField(
         source="semester.number", read_only=True, default=None
     )
     program_code = serializers.CharField(
-        source="semester.program.code", read_only=True, default=None
+        source="program.code", read_only=True, default=None
     )
     faculty_email = serializers.EmailField(
         source="faculty.email", read_only=True, default=None
     )
+    # Multi-faculty relation; writable list of FacultyProfile ids.
+    faculties = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=FacultyProfile.objects.all(),
+        required=False,
+    )
+    # Derived read-only display names for the assigned faculties.
+    faculty_names = serializers.SerializerMethodField()
 
     class Meta:
         model = Subject
@@ -94,21 +106,45 @@ class SubjectSerializer(serializers.ModelSerializer):
             "credits",
             "department",
             "department_code",
+            "program",
+            "program_code",
+            "program_name",
             "semester",
             "semester_number",
-            "program_code",
+            "academic_session",
             "faculty",
             "faculty_name",
             "faculty_email",
+            "faculties",
+            "faculty_names",
             "color",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "faculty_name", "created_at", "updated_at"]
+        # These are nullable/defaulted on the model but required on write. Set
+        # via extra_kwargs (not by redeclaring the fields) so DRF keeps the
+        # model-derived validators — notably the UniqueValidator on ``code`` and
+        # the non-negative bound on ``credits``.
+        extra_kwargs = {
+            "credits": {"required": True},
+            "program": {"required": True, "allow_null": False},
+            "semester": {"required": True, "allow_null": False},
+            "academic_session": {"required": True, "allow_blank": False},
+        }
+
+    def get_faculty_names(self, obj) -> list[str]:
+        return [
+            fp.user.full_name
+            for fp in obj.faculties.all()
+            if fp.user_id is not None
+        ]
 
 
 class ClassSessionSerializer(serializers.ModelSerializer):
     faculty_name = serializers.CharField(source="faculty.full_name", read_only=True, default=None)
+    # Computed session length in minutes (end − start on the "HH:MM" strings).
+    duration_mins = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassSession
@@ -121,12 +157,32 @@ class ClassSessionSerializer(serializers.ModelSerializer):
             "day",
             "start",
             "end",
+            "duration_mins",
             "room",
             "type",
+            "academic_session",
+            "shift",
+            "status",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "duration_mins", "created_at", "updated_at"]
+
+    def get_duration_mins(self, obj):
+        """Minutes between ``start`` and ``end`` (both "HH:MM"); None if unparseable."""
+        start = self._to_minutes(obj.start)
+        end = self._to_minutes(obj.end)
+        if start is None or end is None:
+            return None
+        return end - start
+
+    @staticmethod
+    def _to_minutes(value):
+        try:
+            hours, minutes = str(value).strip().split(":")[:2]
+            return int(hours) * 60 + int(minutes)
+        except (ValueError, AttributeError):
+            return None
 
 
 # --- App-shaped read serializers (mobile contract) ---------------------------

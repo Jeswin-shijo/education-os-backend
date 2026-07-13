@@ -15,16 +15,68 @@ from faculty.models import FacultyClass, FacultyProfile, RosterEntry
 
 
 # --- CRUD serializers --------------------------------------------------------
+class DepartmentRefField(serializers.Field):
+    """Department reference that accepts an id / code / name on write and
+    renders the linked department's id on read.
+
+    The raw reference is passed straight through to
+    :class:`faculty.services.FacultyProfileService`, which resolves it to the
+    ``academics.Department`` FK (and returns a 400 if it can't). Read output is
+    the department id, matching the previous ``PrimaryKeyRelatedField`` shape so
+    the admin list/detail contract is unchanged.
+    """
+
+    default_error_messages = {"blank": "department may not be blank."}
+
+    def to_representation(self, value):
+        # ``value`` is the related Department instance (select_related loaded).
+        return str(value.pk) if value is not None else None
+
+    def to_internal_value(self, data):
+        if data is None:
+            self.fail("blank")
+        text = str(data).strip()
+        if not text:
+            self.fail("blank")
+        return text
+
+
 class FacultyProfileSerializer(serializers.ModelSerializer):
-    """Admin CRUD serializer for FacultyProfile."""
+    """Admin CRUD serializer for FacultyProfile.
+
+    Create accepts a full faculty record in one request: the ``accounts.User``
+    fields (``full_name``/``name``, ``email``, ``phone``, optional ``password``)
+    alongside the profile fields (``department`` as id/code/name, ``designation``,
+    ``qualifications``, ``experience``, ``photo_url``, ``subject_codes``). The
+    service layer creates-or-reuses the User (role=faculty) and its
+    FacultyProfile. An existing ``user`` id may still be supplied instead of the
+    User fields (legacy contract).
+    """
 
     user_name = serializers.CharField(source="user.full_name", read_only=True)
     user_email = serializers.CharField(source="user.email", read_only=True)
+    # Contact number lives on ``accounts.User``; read via the model ``phone``
+    # property, and synced back to the user on write by the service layer.
+    phone = serializers.CharField(required=False, allow_blank=True)
+    department = DepartmentRefField(required=False)
     department_code = serializers.CharField(
         source="department.code", read_only=True
     )
     department_name = serializers.CharField(
         source="department.name", read_only=True
+    )
+    # Write-only User inputs for the combined User + FacultyProfile create. Kept
+    # out of the read shape so list/detail responses are unchanged.
+    full_name = serializers.CharField(
+        required=False, write_only=True, allow_blank=True
+    )
+    name = serializers.CharField(
+        required=False, write_only=True, allow_blank=True
+    )
+    email = serializers.EmailField(required=False, write_only=True)
+    password = serializers.CharField(
+        required=False, write_only=True, allow_blank=True,
+        style={"input_type": "password"},
     )
 
     class Meta:
@@ -34,15 +86,26 @@ class FacultyProfileSerializer(serializers.ModelSerializer):
             "user",
             "user_name",
             "user_email",
+            "full_name",
+            "name",
+            "email",
+            "password",
+            "phone",
             "department",
             "department_code",
             "department_name",
             "designation",
+            "qualifications",
+            "experience",
+            "photo_url",
             "subject_codes",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        # ``user`` is optional: on create the service builds it from the User
+        # fields when no id is supplied.
+        extra_kwargs = {"user": {"required": False}}
 
     def validate_subject_codes(self, value):
         if not isinstance(value, list):
@@ -52,6 +115,15 @@ class FacultyProfileSerializer(serializers.ModelSerializer):
                 "subject_codes must be a list of strings."
             )
         return value
+
+    def validate(self, attrs):
+        # On create we need either an existing user id or an email to build the
+        # faculty User from. (Update may touch profile fields only.)
+        if self.instance is None and not attrs.get("user") and not attrs.get("email"):
+            raise serializers.ValidationError(
+                {"email": "Provide an email (or an existing user id) to create faculty."}
+            )
+        return attrs
 
 
 # --- App-shaped read serializers (mobile contract) ---------------------------
@@ -127,6 +199,7 @@ class FacultyProfileMeSerializer(serializers.ModelSerializer):
             "name": u.full_name,
             "email": u.email,
             "role": u.role,
+            "phone": u.phone,
             "avatarColor": u.avatar_color,
         }
 

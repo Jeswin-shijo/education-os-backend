@@ -41,7 +41,7 @@ from attendance.serializers import (
     AttendanceSummarySerializer,
     SaveSessionSerializer,
 )
-from attendance.services import AttendanceSessionService
+from attendance.services import AttendanceAnalyticsService, AttendanceSessionService
 
 _STAFF_ROLES = set(Role.STAFF)
 
@@ -193,6 +193,61 @@ class AttendanceViewSet(BaseModelViewSet):
             TTL_ATTENDANCE,
             build,
         )
+        return Response(data)
+
+    # -- staff/admin analytics -------------------------------------------
+    @extend_schema(
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "overall_percent": {"type": "integer"},
+                    "by_department": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code": {"type": "string"},
+                                "name": {"type": "string"},
+                                "percent": {"type": "integer"},
+                            },
+                        },
+                    },
+                    "by_program": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code": {"type": "string"},
+                                "name": {"type": "string"},
+                                "percent": {"type": "integer"},
+                            },
+                        },
+                    },
+                    "by_faculty": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string"},
+                                "name": {"type": "string"},
+                                "percent": {"type": "integer"},
+                            },
+                        },
+                    },
+                },
+            }
+        }
+    )
+    @action(detail=False, methods=["get"])
+    def analytics(self, request):
+        """``GET /attendance/analytics`` — attendance rollups for the admin graph.
+
+        Staff/admin only (RBAC matrix). Returns overall attendance percent plus
+        per-department, per-program and per-faculty percentages, aggregated in
+        the service layer and cached under ``attendance:analytics`` (TTL 300s).
+        """
+        data = AttendanceAnalyticsService().analytics()
         return Response(data)
 
     # -- mobile spec read: GET /attendance/{user_id} ---------------------

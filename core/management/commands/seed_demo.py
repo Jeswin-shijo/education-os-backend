@@ -21,6 +21,8 @@ from core.permissions import Role
 # Reference "today" mirrors the mobile seed (app "today" = 2026-06-29).
 TODAY = timezone.make_aware(datetime(2026, 6, 29, 9, 0, 0))
 DEMO_PASSWORD = "campus123"
+# Academic year label applied to subjects and timetable sessions.
+ACADEMIC_SESSION = "2026-2027"
 
 # Palette (mirrors the app's theme colors used in the seed).
 NAVY = "#13327F"
@@ -59,10 +61,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("Seeding AI Campus OS demo data...")
         users = self._seed_users()
-        acad = self._seed_academics()
+        acad = self._seed_academics(users)
         student = self._seed_student(users, acad)
         self._seed_guardian_link(users, student)
         faculty = self._seed_faculty(users, acad)
+        self._seed_timetable(acad, users)
         self._seed_attendance(student, acad, faculty)
         self._seed_assignments(student, acad, faculty)
         self._seed_exams(student, acad, faculty)
@@ -124,17 +127,25 @@ class Command(BaseCommand):
         return users
 
     # -- academics --------------------------------------------------------
-    def _seed_academics(self):
+    def _seed_academics(self, users):
         from academics.models import (
             Department, Program, Semester, Section, Subject,
+            SHIFT_MORNING, SHIFT_AFTERNOON,
         )
 
+        # EXACTLY the ten client-approved engineering departments (code : name).
+        # CSE is kept so student Abin's data stays valid.
         dept_specs = [
             ("CSE", "Computer Science & Engineering"),
-            ("ECE", "Electronics & Communication"),
+            ("CSE-AI", "Computer Science & Engineering (Artificial Intelligence)"),
+            ("CSE-DS", "Computer Science & Engineering (Data Science)"),
+            ("IT", "Information Technology"),
+            ("ECE", "Electronics & Communication Engineering"),
+            ("EEE", "Electrical & Electronics Engineering"),
             ("MECH", "Mechanical Engineering"),
             ("CIVIL", "Civil Engineering"),
-            ("MBA", "Business Administration"),
+            ("AI&DS", "Artificial Intelligence & Data Science"),
+            ("BME", "Biomedical Engineering"),
         ]
         departments = {}
         for code, name in dept_specs:
@@ -142,43 +153,84 @@ class Command(BaseCommand):
             departments[code] = dept
         cse = departments["CSE"]
 
-        program, _ = Program.objects.get_or_create(
-            code="BT-CSE",
-            defaults={
-                "name": "B.Tech Computer Science & Engineering",
-                "department": cse,
-                "duration_years": 4,
-                "intake": 120,
-            },
-        )
-        semester, _ = Semester.objects.get_or_create(program=program, number=5)
-        section, _ = Section.objects.get_or_create(semester=semester, name="A")
+        # EXACTLY ten B.Tech programs, one per department (code -> department code).
+        program_specs = [
+            ("BT-CSE", "CSE"),
+            ("BT-CSE-AI", "CSE-AI"),
+            ("BT-CSE-DS", "CSE-DS"),
+            ("BT-IT", "IT"),
+            ("BT-ECE", "ECE"),
+            ("BT-EEE", "EEE"),
+            ("BT-MECH", "MECH"),
+            ("BT-CIVIL", "CIVIL"),
+            ("BT-AIDS", "AI&DS"),
+            ("BT-BME", "BME"),
+        ]
+        programs = {}
+        for pcode, dcode in program_specs:
+            dept = departments[dcode]
+            prog, _ = Program.objects.get_or_create(
+                code=pcode,
+                defaults={
+                    "name": f"B.Tech {dept.name}",
+                    "department": dept,
+                    "duration_years": 4,
+                    "intake": 120,
+                },
+            )
+            # Creating a program must yield its full set of semesters (4yr -> 1..8).
+            for number in range(1, (prog.duration_years or 4) * 2 + 1):
+                Semester.objects.get_or_create(program=prog, number=number)
+            programs[pcode] = prog
 
+        program = programs["BT-CSE"]
+        semester, _ = Semester.objects.get_or_create(program=program, number=5)
+        # Two sections with a Morning/Afternoon shift mix; "A" carries Abin's data.
+        section, _ = Section.objects.get_or_create(
+            semester=semester, name="A", defaults={"shift": SHIFT_MORNING},
+        )
+        Section.objects.get_or_create(
+            semester=semester, name="B", defaults={"shift": SHIFT_AFTERNOON},
+        )
+
+        # (code, name, credits, faculty_name, color, faculty_user_key)
+        # ``faculty_user_key`` links the legacy single-faculty ``faculty`` FK to a
+        # seeded user so the attendance ``by_faculty`` rollup has buckets; None
+        # keeps the display name only (no user account for that lecturer).
         subject_specs = [
-            ("CS301", "Data Structures", 4, "Dr. Rajesh Menon", NAVY),
-            ("CS302", "Database Management Systems", 4, "Prof. Anita Nair", INFO),
-            ("CS303", "Operating Systems", 4, "Dr. Suresh Pillai", PURPLE),
-            ("MA301", "Mathematics III", 3, "Dr. Lakshmi Iyer", TEAL),
-            ("PH301", "Physics Lab", 2, "Prof. Mohan Das", PINK),
-            ("CS304", "Computer Networks", 4, "Dr. Priya Verghese", WARNING),
+            ("CS301", "Data Structures", 4, "Dr. Rajesh Menon", NAVY, "faculty"),
+            ("CS302", "Database Management Systems", 4, "Prof. Anita Nair", INFO, "faculty_anita"),
+            ("CS303", "Operating Systems", 4, "Dr. Suresh Pillai", PURPLE, "hod"),
+            ("MA301", "Mathematics III", 3, "Dr. Lakshmi Iyer", TEAL, None),
+            ("PH301", "Physics Lab", 2, "Prof. Mohan Das", PINK, None),
+            ("CS304", "Computer Networks", 4, "Dr. Priya Verghese", WARNING, "faculty_priya"),
         ]
         subjects = {}
-        for code, name, credits, faculty_name, color in subject_specs:
+        for code, name, credits, faculty_name, color, fkey in subject_specs:
+            faculty_user = users.get(fkey) if fkey else None
             subj, _ = Subject.objects.get_or_create(
                 code=code,
                 defaults={
                     "name": name,
                     "credits": credits,
                     "department": cse,
+                    "program": program,
+                    "semester": semester,
+                    "academic_session": ACADEMIC_SESSION,
+                    "faculty": faculty_user,
                     "faculty_name": faculty_name,
                     "color": color,
                 },
             )
             subjects[code] = subj
 
-        self.stdout.write(f"  departments: {len(departments)}, subjects: {len(subjects)}")
+        self.stdout.write(
+            f"  departments: {len(departments)}, programs: {len(programs)}, "
+            f"subjects: {len(subjects)}"
+        )
         return {
             "departments": departments,
+            "programs": programs,
             "cse": cse,
             "program": program,
             "semester": semester,
@@ -258,30 +310,59 @@ class Command(BaseCommand):
     def _seed_faculty(self, users, acad):
         from faculty.models import FacultyProfile, FacultyClass, RosterEntry
 
-        profile, _ = FacultyProfile.objects.get_or_create(
-            user=users["faculty"],
-            defaults={
-                "department": acad["cse"],
-                "designation": "Associate Professor",
-                "subject_codes": ["CS301", "CS501", "CS391"],
-            },
-        )
-        # Additional faculty profiles so the HOD directory + allocation board
-        # have more than one teacher to reassign a subject between.
-        for key, designation, codes in [
-            ("faculty_anita", "Assistant Professor", ["CS301", "CS391"]),
-            ("faculty_priya", "Assistant Professor", ["CS501"]),
-        ]:
-            extra_user = users.get(key)
-            if extra_user is not None:
-                FacultyProfile.objects.get_or_create(
-                    user=extra_user,
-                    defaults={
-                        "department": acad["cse"],
-                        "designation": designation,
-                        "subject_codes": codes,
-                    },
-                )
+        # (user_key, designation, subject_codes, qualifications, experience, photo_url)
+        # Personal-info fields (qualifications/experience/photo_url) are surfaced
+        # by the admin console; phone lives on the linked user (set in _seed_users).
+        faculty_specs = [
+            ("faculty", "Associate Professor", ["CS301", "CS501", "CS391"],
+             "Ph.D. in Computer Science (IISc Bangalore); M.Tech CSE (NIT Trichy)",
+             "12 years",
+             "https://ui-avatars.com/api/?name=Rajesh+Menon&background=7C3AED&color=fff"),
+            ("faculty_anita", "Assistant Professor", ["CS301", "CS391"],
+             "M.Tech Information Technology (NIT Calicut); B.Tech CSE",
+             "8 years",
+             "https://ui-avatars.com/api/?name=Anita+Nair&background=2563EB&color=fff"),
+            ("faculty_priya", "Assistant Professor", ["CS501", "CS304"],
+             "Ph.D. in Computer Networks (Anna University); M.E. Communication Systems",
+             "6 years",
+             "https://ui-avatars.com/api/?name=Priya+Verghese&background=0D9488&color=fff"),
+        ]
+        profiles = {}
+        for key, designation, codes, quals, experience, photo_url in faculty_specs:
+            fac_user = users.get(key)
+            if fac_user is None:
+                continue
+            prof, _ = FacultyProfile.objects.get_or_create(
+                user=fac_user,
+                defaults={
+                    "department": acad["cse"],
+                    "designation": designation,
+                    "subject_codes": codes,
+                    "qualifications": quals,
+                    "experience": experience,
+                    "photo_url": photo_url,
+                },
+            )
+            profiles[key] = prof
+        profile = profiles["faculty"]
+
+        # Assign the multi-faculty M2M on subjects (idempotent ``set``). Keys map
+        # to the FacultyProfiles created above; CS301/CS304 get two teachers so
+        # the admin console shows a multi-faculty subject.
+        subject_faculty_map = {
+            "CS301": ["faculty", "faculty_anita"],
+            "CS302": ["faculty_anita"],
+            "CS303": ["faculty_priya"],
+            "MA301": ["faculty"],
+            "PH301": ["faculty_anita"],
+            "CS304": ["faculty_priya", "faculty"],
+        }
+        for code, keys in subject_faculty_map.items():
+            subj = acad["subjects"].get(code)
+            if subj is None:
+                continue
+            subj.faculties.set([profiles[k] for k in keys if k in profiles])
+
         ds = acad["subjects"]["CS301"]
         semester = acad["semester"]
         section = acad["section"]
@@ -343,6 +424,52 @@ class Command(BaseCommand):
             )
         self.stdout.write(f"  faculty classes: {len(classes)}")
         return {"profile": profile, "classes": classes}
+
+    # -- timetable --------------------------------------------------------
+    def _seed_timetable(self, acad, users):
+        """Weekly timetable ``ClassSession`` rows for section A.
+
+        These back ``GET /api/v1/timetable`` (incl. the ``?faculty=`` filter) and
+        carry the client-change fields: ``academic_session``, ``shift`` and
+        ``status``. Natural key is (subject, section, day, start).
+        """
+        from academics.models import ClassSession, SHIFT_MORNING
+
+        subjects = acad["subjects"]
+        section = acad["section"]
+        # (code, day, start, end, room, type, faculty_user_key)
+        session_specs = [
+            ("CS301", "Mon", "09:00", "09:50", "B-201", ClassSession.TYPE_LECTURE, "faculty"),
+            ("CS302", "Tue", "10:00", "10:50", "B-201", ClassSession.TYPE_LECTURE, "faculty_anita"),
+            ("CS303", "Wed", "11:10", "12:00", "B-203", ClassSession.TYPE_LECTURE, "hod"),
+            ("CS304", "Thu", "14:00", "14:50", "B-202", ClassSession.TYPE_LECTURE, "faculty_priya"),
+            ("CS301", "Fri", "13:00", "14:50", "Lab-1", ClassSession.TYPE_LAB, "faculty"),
+            ("MA301", "Mon", "11:10", "12:00", "B-201", ClassSession.TYPE_TUTORIAL, None),
+        ]
+        n = 0
+        for code, day, start, end, room, typ, fkey in session_specs:
+            subj = subjects.get(code)
+            if subj is None:
+                continue
+            faculty_user = users.get(fkey) if fkey else None
+            _, created = ClassSession.objects.get_or_create(
+                subject=subj,
+                section=section,
+                day=day,
+                start=start,
+                defaults={
+                    "end": end,
+                    "room": room,
+                    "type": typ,
+                    "faculty": faculty_user,
+                    "academic_session": ACADEMIC_SESSION,
+                    "shift": SHIFT_MORNING,
+                    "status": ClassSession.STATUS_ACTIVE,
+                },
+            )
+            if created:
+                n += 1
+        self.stdout.write(f"  timetable sessions: {len(session_specs)} (+{n})")
 
     # -- attendance -------------------------------------------------------
     def _seed_attendance(self, student, acad, faculty):
