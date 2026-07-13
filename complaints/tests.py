@@ -186,6 +186,11 @@ class ComplaintAPITests(APITestCase):
         self.assertEqual(by_status["in_progress"], 1)
         self.assertEqual(by_status["resolved"], 1)
         self.assertEqual(len(data["complaints"]), 3)
+        first = data["complaints"][0]
+        self.assertIn("student", first)
+        self.assertIn("studentName", first)
+        self.assertIn("student_name", first)
+        self.assertTrue(first["studentName"])
 
     def test_admin_monitor_status_filter(self):
         self.client.force_authenticate(self.admin)
@@ -197,6 +202,7 @@ class ComplaintAPITests(APITestCase):
         self.assertEqual(data["total"], 3)
         self.assertEqual(len(data["complaints"]), 1)
         self.assertEqual(data["complaints"][0]["subject"], "Wrong invoice")
+        self.assertEqual(data["complaints"][0]["studentName"], "Bob")
 
     def test_student_cannot_monitor(self):
         self.client.force_authenticate(self.student)

@@ -22,12 +22,32 @@ class ComplaintSerializer(serializers.ModelSerializer):
     """Matches ``types.ts`` ``Complaint`` (camelCase read shape)."""
 
     id = serializers.CharField(read_only=True)
+    student = serializers.CharField(source="user_id", read_only=True)
+    studentName = serializers.CharField(source="user.full_name", read_only=True)
+    student_name = serializers.CharField(source="user.full_name", read_only=True)
     createdOn = serializers.DateTimeField(source="created_on", read_only=True)
 
     class Meta:
         model = Complaint
-        fields = ["id", "category", "subject", "description", "status", "createdOn"]
-        read_only_fields = ["id", "status", "createdOn"]
+        fields = [
+            "id",
+            "student",
+            "studentName",
+            "student_name",
+            "category",
+            "subject",
+            "description",
+            "status",
+            "createdOn",
+        ]
+        read_only_fields = [
+            "id",
+            "student",
+            "studentName",
+            "student_name",
+            "status",
+            "createdOn",
+        ]
 
 
 class ComplaintCreateSerializer(serializers.ModelSerializer):
