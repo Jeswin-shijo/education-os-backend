@@ -19,7 +19,17 @@ class FeeInvoiceSerializer(serializers.ModelSerializer):
 
     id = serializers.CharField(read_only=True)
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
-    dueDate = serializers.DateField(source="due_date", required=False, allow_null=True)
+    dueDate = serializers.DateField(
+        source="due_date",
+        required=False,
+        allow_null=True,
+        input_formats=[
+            "%Y-%m-%d",
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S",
+        ],
+    )
     paidOn = serializers.DateTimeField(source="paid_on", read_only=True)
 
     class Meta:

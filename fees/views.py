@@ -111,6 +111,32 @@ class FeeInvoiceViewSet(BaseModelViewSet):
             total = agg or Decimal("0")
         return Response({"total": total})
 
+    # -- GET /fees/summary ----------------------------------------------------
+    # Aggregate money totals over the SAME scoped + filtered (student/status/term/
+    # search) queryset the list uses, so the FeeManagement summary cards stay
+    # correct even though the list itself is paginated.
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        from decimal import Decimal
+        from django.db.models import Q, Sum
+
+        qs = self.filter_queryset(self.get_queryset())
+        unpaid = ~Q(status=FeeInvoice.STATUS_PAID)
+        agg = qs.aggregate(
+            billed=Sum("amount"),
+            outstanding=Sum("amount", filter=unpaid),
+            paid=Sum("amount", filter=Q(status=FeeInvoice.STATUS_PAID)),
+        )
+        zero = Decimal("0")
+        return Response(
+            {
+                "billed": agg["billed"] or zero,
+                "outstanding": agg["outstanding"] or zero,
+                "paid": agg["paid"] or zero,
+                "count": qs.count(),
+            }
+        )
+
     # ======================================================================
     # Mobile API contract v1 (snake_case, {user_id}-parameterized) endpoints.
     # ======================================================================

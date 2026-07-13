@@ -168,23 +168,69 @@ class SubjectService(BaseService):
     def create(self, **data):
         """Create a subject, assigning the ``faculties`` M2M after insert.
 
-        A M2M cannot be set during ``objects.create``; pop it out, create the
-        row, then ``set`` the relation.
+        ``faculties`` arrives as a list of faculty *User* instances (see
+        :class:`~academics.serializers.SubjectSerializer`). Each is resolved to
+        its :class:`~faculty.models.FacultyProfile` — created on demand under the
+        subject's department for any faculty that lacks one — before the M2M is
+        set. A M2M cannot be set during ``objects.create``, so it is applied
+        after the row exists. The first selection is mirrored onto the legacy
+        ``faculty``/``faculty_name`` fields.
         """
-        faculties = data.pop("faculties", None)
+        faculty_users = data.pop("faculties", None)
+        if faculty_users is not None:
+            self._apply_legacy_faculty(data, faculty_users)
         instance = super().create(**data)
-        if faculties is not None:
-            instance.faculties.set(faculties)
+        if faculty_users is not None:
+            instance.faculties.set(
+                self._resolve_profiles(faculty_users, instance.department_id)
+            )
         return instance
 
     def update(self, instance, **data):
         """Update a subject; only reassign ``faculties`` when it was supplied."""
         has_faculties = "faculties" in data
-        faculties = data.pop("faculties", None)
+        faculty_users = data.pop("faculties", None)
+        if has_faculties:
+            self._apply_legacy_faculty(data, faculty_users or [])
         instance = super().update(instance, **data)
         if has_faculties:
-            instance.faculties.set(faculties or [])
+            instance.faculties.set(
+                self._resolve_profiles(faculty_users or [], instance.department_id)
+            )
         return instance
+
+    @staticmethod
+    def _resolve_profiles(faculty_users, department_id):
+        """Map faculty ``User`` objects to their ``FacultyProfile`` rows.
+
+        A faculty user may not have a profile yet (e.g. one created before
+        profiles were auto-provisioned), so missing profiles are created under
+        ``department_id`` — the subject's department — as a sensible default.
+        Returns a list of ``FacultyProfile`` instances for the M2M.
+        """
+        from faculty.models import FacultyProfile
+
+        profiles = []
+        for user in faculty_users:
+            profile, _ = FacultyProfile.objects.get_or_create(
+                user=user,
+                defaults={"department_id": department_id},
+            )
+            profiles.append(profile)
+        return profiles
+
+    @staticmethod
+    def _apply_legacy_faculty(data, faculty_users):
+        """Mirror the first selected faculty onto the legacy single-faculty
+        ``faculty`` FK + ``faculty_name``.
+
+        The admin console only sends ``faculties``; keeping the legacy fields in
+        sync preserves the attendance ``by_faculty`` rollup and the mobile
+        ``SubjectAppSerializer`` (which read the singular ``faculty``).
+        """
+        first = faculty_users[0] if faculty_users else None
+        data["faculty"] = first
+        data["faculty_name"] = first.full_name if first else ""
 
     def invalidate_cache(self, instance=None) -> None:
         invalidate_prefix(SUBJECTS_PREFIX)

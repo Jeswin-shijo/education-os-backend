@@ -139,6 +139,7 @@ class StudentSerializer(serializers.ModelSerializer):
             "cgpa",
             "blood_group",
             "mentor_name",
+            "address",
             "avatar_color",
             "status",
             "addresses",
@@ -195,6 +196,7 @@ class StudentAppSerializer(serializers.ModelSerializer):
             "phone",
             "mentorName",
             "bloodGroup",
+            "address",
         ]
 
     def get_program(self, obj) -> str:
@@ -239,6 +241,7 @@ class StudentProfileSpecSerializer(serializers.ModelSerializer):
             "mentor",
             "admission_no",
             "roll_no",
+            "address",
             "department",
             "semester",
             "section",

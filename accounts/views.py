@@ -294,6 +294,7 @@ class RegisterView(APIView):
         for key in (
             "roll_no", "admission_no", "department", "program",
             "semester", "section", "gender", "dob", "blood_group", "mentor_name",
+            "address",
         ):
             value = data.pop(key, None)
             if value:
@@ -340,6 +341,7 @@ class RegisterView(APIView):
                 "dob": student_fields.get("dob"),
                 "blood_group": student_fields.get("blood_group", ""),
                 "mentor_name": student_fields.get("mentor_name", ""),
+                "address": student_fields.get("address", ""),
                 "avatar_color": user.avatar_color,
                 "profile_pic": profile_pic,
             }

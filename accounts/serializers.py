@@ -100,7 +100,8 @@ class RegisterSerializer(serializers.Serializer):
 
     When ``role`` is ``student``, optional student profile fields (``roll_no``,
     ``admission_no``, ``department``, ``program``, ``semester``, ``section``,
-    ``gender``, ``dob``, ``blood_group``, ``mentor_name``) may be provided.
+    ``gender``, ``dob``, ``blood_group``, ``mentor_name``, ``address``) may be
+    provided.
     The backend will auto-create the linked :class:`~students.models.Student`
     profile in a single step — no separate call required.
     """
@@ -126,6 +127,7 @@ class RegisterSerializer(serializers.Serializer):
     dob = serializers.DateField(required=False, allow_null=True, default=None)
     blood_group = serializers.CharField(max_length=8, required=False, allow_blank=True, default="")
     mentor_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    address = serializers.CharField(required=False, allow_blank=True, default="")
 
     # --- Optional faculty profile fields (used only when role == "faculty") ---
     designation = serializers.CharField(max_length=128, required=False, allow_blank=True, default="")

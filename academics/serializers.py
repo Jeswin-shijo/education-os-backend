@@ -10,6 +10,7 @@ Two flavours:
 """
 from rest_framework import serializers
 
+from accounts.models import User
 from academics.models import (
     ClassSession,
     Department,
@@ -18,6 +19,7 @@ from academics.models import (
     Semester,
     Subject,
 )
+from core.permissions import Role
 from faculty.models import FacultyProfile
 
 
@@ -88,10 +90,14 @@ class SubjectSerializer(serializers.ModelSerializer):
     faculty_email = serializers.EmailField(
         source="faculty.email", read_only=True, default=None
     )
-    # Multi-faculty relation; writable list of FacultyProfile ids.
+    # Multi-faculty relation. Writable list of faculty *User* ids — matching the
+    # ``faculty-candidates`` endpoint and the legacy single-faculty ``faculty`` FK
+    # (everything else in the system identifies faculty by user id). The write is
+    # resolved to ``FacultyProfile`` rows by ``SubjectService``, which also mirrors
+    # the first selection onto the legacy ``faculty``/``faculty_name`` fields.
     faculties = serializers.PrimaryKeyRelatedField(
         many=True,
-        queryset=FacultyProfile.objects.all(),
+        queryset=User.objects.filter(role__in=[Role.FACULTY, Role.HOD]),
         required=False,
     )
     # Derived read-only display names for the assigned faculties.

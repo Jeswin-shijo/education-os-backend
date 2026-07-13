@@ -98,6 +98,7 @@ class Student(BaseModel):
     cgpa = models.DecimalField(max_digits=4, decimal_places=2, default=0)
     blood_group = models.CharField(max_length=8, blank=True, default="")
     mentor_name = models.CharField(max_length=255, blank=True, default="")
+    address = models.TextField(blank=True, default="")
     avatar_color = models.CharField(max_length=9, blank=True, default="")
     profile_pic = models.ImageField(
         upload_to="student_pics/", null=True, blank=True
