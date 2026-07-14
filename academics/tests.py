@@ -147,3 +147,35 @@ class AcademicsAPITests(APITestCase):
         )
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["status"], "error")
+
+    def test_create_duplicate_section_is_400_not_500(self):
+        # setUp already created section "A" in self.sem. Re-adding it must be a
+        # clean 400 (the partial unique constraint would otherwise surface the
+        # IntegrityError as a bare 500 "Internal server error.").
+        self.client.force_authenticate(self.admin)
+        resp = self.client.post(
+            reverse("academics:section-list"),
+            {"semester": str(self.sem.id), "name": "A", "shift": "Morning"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()["status"], "error")
+        self.assertIn("already exists", resp.json()["message"])
+
+    def test_create_section_restores_soft_deleted_match(self):
+        # A section whose name matches a soft-deleted row should reuse (restore)
+        # that row rather than 500 or leave an orphan behind a fresh insert.
+        self.client.force_authenticate(self.admin)
+        self.section.delete()  # soft delete "A"
+        resp = self.client.post(
+            reverse("academics:section-list"),
+            {"semester": str(self.sem.id), "name": "A", "shift": "Evening"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.section.refresh_from_db()
+        self.assertFalse(self.section.is_deleted)
+        self.assertEqual(self.section.shift, "Evening")
+        self.assertEqual(
+            Section.all_objects.filter(semester=self.sem, name="A").count(), 1
+        )

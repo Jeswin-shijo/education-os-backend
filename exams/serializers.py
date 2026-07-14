@@ -70,6 +70,8 @@ class ExamAppSerializer(serializers.ModelSerializer):
 
     id = serializers.CharField(read_only=True)
     subjectId = serializers.CharField(source="subject_id", read_only=True)
+    subjectName = serializers.CharField(source="subject.name", read_only=True, default="")
+    subjectCode = serializers.CharField(source="subject.code", read_only=True, default="")
     durationMins = serializers.IntegerField(source="duration_mins", read_only=True)
 
     class Meta:
@@ -77,6 +79,8 @@ class ExamAppSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "subjectId",
+            "subjectName",
+            "subjectCode",
             "name",
             "date",
             "time",
@@ -90,6 +94,8 @@ class ExamResultAppSerializer(serializers.ModelSerializer):
     """Matches ``types.ts`` ``ExamResult`` (camelCase, denormalized subject)."""
 
     id = serializers.CharField(read_only=True)
+    studentId = serializers.SerializerMethodField()
+    studentName = serializers.SerializerMethodField()
     subjectId = serializers.CharField(source="subject_id", read_only=True)
     subjectName = serializers.CharField(source="subject.name", read_only=True)
     maxMarks = serializers.DecimalField(
@@ -103,6 +109,8 @@ class ExamResultAppSerializer(serializers.ModelSerializer):
         model = ExamResult
         fields = [
             "id",
+            "studentId",
+            "studentName",
             "subjectId",
             "subjectName",
             "exam",
@@ -112,6 +120,12 @@ class ExamResultAppSerializer(serializers.ModelSerializer):
             "gradePoint",
             "credits",
         ]
+
+    def get_studentId(self, obj) -> str:
+        return str(obj.student_id) if obj.student_id else ""
+
+    def get_studentName(self, obj) -> str:
+        return obj.student.full_name if obj.student_id else ""
 
 
 class MarkEntryAppSerializer(serializers.ModelSerializer):

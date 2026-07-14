@@ -155,6 +155,32 @@ class SectionService(BaseService):
     repository_class = SectionRepository
     entity_name = "Section"
 
+    def create(self, **data):
+        """Create a section, guarding the ``(semester, name)`` uniqueness.
+
+        The DB constraint is *partial* (``condition=is_deleted=False``), so DRF's
+        ``ModelSerializer`` doesn't auto-generate a ``UniqueTogetherValidator``
+        for it — a duplicate would otherwise reach the DB and raise an
+        ``IntegrityError`` that surfaces as a bare 500 ("Internal server
+        error."). Convert that into a clean 400: reject an active duplicate with
+        a readable message, and restore a soft-deleted match instead of leaving
+        an orphaned row behind a fresh insert.
+        """
+        semester = data.get("semester")
+        name = data.get("name")
+        if semester is not None and name:
+            if self.model.objects.filter(semester=semester, name=name).exists():
+                raise ValidationError(
+                    f'Section "{name}" already exists in this semester.'
+                )
+            deleted = self.model.all_objects.filter(
+                semester=semester, name=name, is_deleted=True
+            ).first()
+            if deleted is not None:
+                deleted.restore()
+                return self.update(deleted, **data)
+        return super().create(**data)
+
     def invalidate_cache(self, instance=None) -> None:
         # Sections shape the timetable grid grouping.
         invalidate_prefix(TIMETABLE_PREFIX)
