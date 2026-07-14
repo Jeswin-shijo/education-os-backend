@@ -34,13 +34,14 @@ class StudentDashboardSpecSerializer(serializers.Serializer):
     """Spec-exact (snake_case) shape for ``GET /api/v1/dashboard/student/{user_id}``.
 
     Matches ``API_CONTRACT_V1`` §Dashboard:
-    ``{ student_name, roll_no, department, semester, attendance_percentage, cgpa,
-    pending_fees, pending_approvals, unread_chats, next_exam:{subject,time,room} }``.
+    ``{ student_name, roll_no, department, program, semester, attendance_percentage,
+    cgpa, pending_fees, pending_approvals, unread_chats, next_exam:{subject,time,room} }``.
     """
 
     student_name = serializers.CharField()
     roll_no = serializers.CharField()
     department = serializers.CharField(allow_blank=True)
+    program = serializers.CharField(allow_blank=True)
     semester = serializers.IntegerField()
     attendance_percentage = serializers.IntegerField()
     cgpa = serializers.FloatField()

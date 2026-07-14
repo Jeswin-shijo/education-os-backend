@@ -209,6 +209,7 @@ class DashboardService:
             "student_name": student.full_name,
             "roll_no": student.roll_no,
             "department": student.department.name if student.department_id else "",
+            "program": student.program.name if student.program_id else "",
             "semester": student.semester.number if student.semester_id else 0,
             "attendance_percentage": self.repo.attendance_percent(student),
             "cgpa": gpa,

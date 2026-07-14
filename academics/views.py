@@ -225,6 +225,35 @@ class SubjectViewSet(BaseModelViewSet):
     search_fields = ["code", "name", "faculty_name"]
     ordering_fields = ["code", "name", "credits", "created_at"]
 
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[IsAuthenticated],
+    )
+    def mine(self, request):
+        """``GET /subjects/mine`` — the requesting student's enrolled subjects.
+
+        App-shaped (camelCase, with ``color``) and scoped to the student's
+        semester (falling back to their department). Empty list for a user with
+        no student profile. This is what the mobile Subjects screen consumes, so
+        the ids it navigates with are the backend's real subject ids.
+        """
+        from students.models import Student
+
+        student = Student.objects.filter(
+            user=request.user, is_deleted=False
+        ).first()
+        if student is None:
+            return Response([])
+        qs = self.get_queryset()
+        if student.semester_id:
+            qs = qs.filter(semester_id=student.semester_id)
+        elif student.department_id:
+            qs = qs.filter(department_id=student.department_id)
+        else:
+            qs = qs.none()
+        return Response(SubjectAppSerializer(qs.order_by("code"), many=True).data)
+
     @action(detail=False, methods=["get"], url_path="faculty-candidates")
     def faculty_candidates(self, request):
         """``GET /subjects/faculty-candidates`` — faculty users for dropdown."""

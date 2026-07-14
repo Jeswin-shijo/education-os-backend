@@ -72,20 +72,29 @@ class StudentMaterialSerializer(serializers.ModelSerializer):
 
     id = serializers.CharField(read_only=True)
     subjectId = serializers.SerializerMethodField()
+    subjectName = serializers.SerializerMethodField()
     sizeLabel = serializers.CharField(source="size_label", read_only=True)
     addedAt = serializers.DateTimeField(source="added_at", read_only=True)
 
     class Meta:
         model = Material
-        fields = ["id", "subjectId", "title", "kind", "sizeLabel", "addedAt"]
+        fields = ["id", "subjectId", "subjectName", "title", "kind", "sizeLabel", "addedAt"]
 
-    def get_subjectId(self, obj):
+    def _subject(self, obj):
         # Prefer the direct subject; fall back to the class's subject if any.
         if obj.subject_id:
-            return str(obj.subject_id)
+            return obj.subject
         if obj.faculty_class_id and obj.faculty_class.subject_id:
-            return str(obj.faculty_class.subject_id)
-        return ""
+            return obj.faculty_class.subject
+        return None
+
+    def get_subjectId(self, obj):
+        subject = self._subject(obj)
+        return str(subject.id) if subject else ""
+
+    def get_subjectName(self, obj):
+        subject = self._subject(obj)
+        return subject.name if subject else ""
 
 
 class FacultyMaterialSerializer(serializers.ModelSerializer):

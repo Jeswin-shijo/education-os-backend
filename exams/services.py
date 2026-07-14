@@ -103,32 +103,46 @@ class ExamResultService(BaseService):
             entry = by_subject.setdefault(
                 r.subject_id,
                 {
+                    "subject_id": str(r.subject_id) if r.subject_id else "",
                     "subject": r.subject.name if r.subject else "",
                     "internal": Decimal("0"),
                     "external": Decimal("0"),
                     "grade": "",
+                    "grade_point": Decimal("0"),
+                    "credits": Decimal("0"),
                 },
             )
             marks = r.marks or Decimal("0")
+            # Credits are a property of the subject (same across its result rows).
+            if r.credits:
+                entry["credits"] = r.credits
             if self._is_external(r):
                 entry["external"] += marks
                 if r.grade:
                     entry["grade"] = r.grade
+                if r.grade_point is not None:
+                    entry["grade_point"] = r.grade_point
             else:
                 entry["internal"] += marks
                 if not entry["grade"] and r.grade:
                     entry["grade"] = r.grade
+                # Fall back to an internal row's grade point if no external one.
+                if not entry["grade_point"] and r.grade_point is not None:
+                    entry["grade_point"] = r.grade_point
 
         subjects = []
         for entry in by_subject.values():
             total = entry["internal"] + entry["external"]
             subjects.append(
                 {
+                    "subject_id": entry["subject_id"],
                     "subject": entry["subject"],
                     "internal": float(entry["internal"]),
                     "external": float(entry["external"]),
                     "total": float(total),
                     "grade": entry["grade"],
+                    "grade_point": float(entry["grade_point"]),
+                    "credits": float(entry["credits"]),
                 }
             )
         return subjects

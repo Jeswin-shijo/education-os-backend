@@ -62,6 +62,8 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
 
     id = serializers.CharField(read_only=True)
     subjectId = serializers.CharField(source="subject_id", read_only=True)
+    subjectName = serializers.SerializerMethodField()
+    subjectCode = serializers.SerializerMethodField()
     dueDate = serializers.DateTimeField(source="due_date", read_only=True)
     maxMarks = serializers.IntegerField(source="max_marks", read_only=True)
     status = serializers.SerializerMethodField()
@@ -74,6 +76,8 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "subjectId",
+            "subjectName",
+            "subjectCode",
             "title",
             "description",
             "dueDate",
@@ -83,6 +87,12 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
             "grade",
             "attachmentName",
         ]
+
+    def get_subjectName(self, obj) -> str:
+        return obj.subject.name if obj.subject_id else ""
+
+    def get_subjectCode(self, obj) -> str:
+        return obj.subject.code if obj.subject_id else ""
 
     def _submission(self, obj):
         return (self.context.get("submissions") or {}).get(obj.id)

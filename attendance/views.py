@@ -297,6 +297,7 @@ class AttendanceViewSet(BaseModelViewSet):
             )
             subject_wise = [
                 {
+                    "subject_id": str(r["subject_id"]) if r["subject_id"] else "",
                     "subject": r["subject__name"] or "",
                     "attended": r["attended"] or 0,
                     "total": r["total"] or 0,

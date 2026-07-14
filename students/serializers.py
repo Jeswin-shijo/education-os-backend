@@ -222,12 +222,14 @@ class StudentProfileSpecSerializer(serializers.ModelSerializer):
     """``GET /api/v1/students/by-user/{user_id}`` — snake_case profile.
 
     ``{ name, email, phone, blood_group, mentor, admission_no, roll_no,
-    department, semester, section }`` (academic FKs flattened to display values).
+    department, program, semester, section }`` (academic FKs flattened to display
+    values).
     """
 
     name = serializers.CharField(source="full_name", read_only=True)
     mentor = serializers.CharField(source="mentor_name", read_only=True)
     department = serializers.SerializerMethodField()
+    program = serializers.SerializerMethodField()
     semester = serializers.SerializerMethodField()
     section = serializers.SerializerMethodField()
 
@@ -243,12 +245,16 @@ class StudentProfileSpecSerializer(serializers.ModelSerializer):
             "roll_no",
             "address",
             "department",
+            "program",
             "semester",
             "section",
         ]
 
     def get_department(self, obj) -> str:
         return obj.department.name if obj.department_id else ""
+
+    def get_program(self, obj) -> str:
+        return obj.program.name if obj.program_id else ""
 
     def get_semester(self, obj) -> int:
         return obj.semester.number if obj.semester_id else 0
