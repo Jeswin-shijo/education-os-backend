@@ -18,7 +18,7 @@ from core.permissions import Role
 from core.services import BaseService
 from accounts.models import OTP
 from accounts.repositories import UserRepository
-from accounts.tasks import send_otp_email, send_welcome_email
+from accounts.tasks import safe_delay, send_otp_email, send_welcome_email
 
 User = get_user_model()
 
@@ -160,7 +160,7 @@ class AuthService(BaseService):
         if user is None or not user.is_active:
             return None
         otp = OTP.issue(user, purpose=OTP.PURPOSE_RESET)
-        send_otp_email.delay(user.email, otp.code, OTP.PURPOSE_RESET)
+        safe_delay(send_otp_email, user.email, otp.code, OTP.PURPOSE_RESET)
         self.actor = user
         self.audit(AuditLog.ACTION_UPDATE, entity_id=user.pk, changes={"otp": "issued"})
         return otp
@@ -225,5 +225,5 @@ class UserService(BaseService):
             entity_id=user.pk,
             changes={"email": email, "role": role},
         )
-        send_welcome_email.delay(user.email, user.full_name)
+        safe_delay(send_welcome_email, user.email, user.full_name)
         return user

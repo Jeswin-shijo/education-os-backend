@@ -33,6 +33,25 @@ except Exception:  # pragma: no cover
         return wrap
 
 
+def safe_delay(task, *args, **kwargs) -> None:
+    """Enqueue ``task`` via Celery, swallowing broker/connection errors.
+
+    ``.delay()`` publishes to the broker and RAISES (e.g. ``OperationalError:
+    Connection refused``) when the broker (Redis) is unreachable — before the
+    task's own error handling runs. These emails are best-effort, so a down or
+    misconfigured broker must never turn a successful request (e.g. registering
+    a student) into a 500.
+    """
+    try:
+        task.delay(*args, **kwargs)
+    except Exception:  # noqa: BLE001 - broker unavailable must not break the request
+        logger.warning(
+            "Could not enqueue %s (broker unavailable?)",
+            getattr(task, "name", task),
+            exc_info=True,
+        )
+
+
 def _from_email() -> str:
     return getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@aicampus.os")
 
